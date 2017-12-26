@@ -17,6 +17,7 @@
 #include <iterator>
 #include <functional>
 #include <thread>
+#include <chrono>
 #include <testfuncs/benchmarks.hpp>
 
 using BM = Benchmark<double>;
@@ -26,7 +27,7 @@ const static int procs = 64;
 
 const static int mtStepsLimit = 1000;
 
-const static int maxStepsTotal = 10000000;
+const static int maxStepsTotal = 1000000;
 
 struct State {
 
@@ -208,18 +209,23 @@ double findMin(const BM& bm, double eps, int maxstep) {
     s.mRecordVal = std::numeric_limits<double>::max();
     s.mMaxSteps = maxstep;
     s.mProcs = procs;
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+    start = std::chrono::system_clock::now();
 #if 0   
     solveSerial(s, bm, eps);
 #else    
     solve(s, bm, eps);
 #endif
-    //std::thread th(solveSerial, std::ref(s), std::ref(bm), eps);
-    //th.join();
+    end = std::chrono::system_clock::now();
+    int mseconds = (std::chrono::duration_cast<std::chrono::microseconds> (end-start)).count();
+    std::cout << "Time: " << mseconds << " microsecond\n";
+    std::cout << "Time per subproblem: " << ((mseconds > 0) ? ((double) s.mSteps / (double) mseconds) : 0) << " miscroseconds." << std::endl;
     if (s.mSteps >= maxstep) {
         std::cout << "Failed to converge in " << maxstep << " steps\n";
     } else {
         std::cout << "Converged in " << s.mSteps << " steps\n";
     }
+    
     std::cout << "BnB found = " << s.mRecordVal << std::endl;
     std::cout << " at x [ ";
     std::copy(s.mRecord.begin(), s.mRecord.end(), std::ostream_iterator<double>(std::cout, " "));
