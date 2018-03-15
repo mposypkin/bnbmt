@@ -1,7 +1,7 @@
 ROOT = ../testbed/mathexplib/
-BINS = tutorialbnbmt.exe
-TESTS = tutorialbnbmt.exe
+BINS = tutorialbnbmt.exe bnbshrec.exe
+TESTS = 
 
 
-include $(ROOT)all.inc
+include all.inc
 -include deps.inc

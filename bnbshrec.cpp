@@ -18,6 +18,7 @@
 #include <functional>
 #include <thread>
 #include <chrono>
+#include <shared_mutex>
 #include <testfuncs/benchmarks.hpp>
 
 using BM = Benchmark<double>;
@@ -29,14 +30,32 @@ const static int mtStepsLimit = 1000;
 
 const static int maxStepsTotal = 1000000;
 
+struct Record {
+
+    double getValue() const {
+        std::shared_lock<std::shared_mutex> lock(mMut);
+        //std::unique_lock<std::shared_mutex> lock(mMut);
+        //std::lock_guard<std::mutex> lock(mMut);
+        return mValue;
+    }
+
+    void update(double nval, const std::vector<double>& nrecord) {
+        std::unique_lock<std::shared_mutex> lock(mMut);
+        //std::lock_guard<std::mutex> lock(mMut);
+        mValue = nval;
+        mVector = nrecord;
+    }
+
+    mutable std::shared_mutex mMut;
+    //mutable std::mutex mMut;
+    double mValue;
+    std::vector<double> mVector;
+};
+
 struct State {
 
     void merge(const State& s) {
         mSteps += s.mSteps;
-        if (s.mRecordVal < mRecordVal) {
-            mRecordVal = s.mRecordVal;
-            mRecord = s.mRecord;
-        }
         mPool.insert(mPool.end(), s.mPool.begin(), s.mPool.end());
     }
 
@@ -47,11 +66,6 @@ struct State {
         s1.mProcs = mProcs / 2;
         s2.mProcs = mProcs - s1.mProcs;
 
-        s1.mRecord = mRecord;
-        s2.mRecord = mRecord;
-
-        s1.mRecordVal = mRecordVal;
-        s2.mRecordVal = mRecordVal;
         while (true) {
             if (mPool.empty())
                 break;
@@ -64,9 +78,6 @@ struct State {
         }
     }
 
-    double mRecordVal;
-
-    std::vector<double> mRecord;
 
     std::vector<Box> mPool;
 
@@ -77,15 +88,9 @@ struct State {
     int mProcs;
 };
 
+Record record;
+
 std::ostream& operator<<(std::ostream & out, const State s) {
-    out << "\"recval\" : " << s.mRecordVal << "\n";
-    out << "\"record\" : [";
-    for (int i = 0; i < s.mRecord.size(); i++) {
-        out << s.mRecord[i];
-        if (i != s.mRecord.size() - 1)
-            out << ", ";
-    }
-    out << "]\n";
     out << "\"steps\" :" << s.mSteps << "\n";
     out << "\"max steps\" :" << s.mMaxSteps << "\n";
     return out;
@@ -123,17 +128,16 @@ void solveSerial(State& s, const BM& bm, double eps) {
     const int dim = bm.getDim();
     std::vector<double> c(dim);
     while (!s.mPool.empty()) {
-        s.mSteps ++;
+        s.mSteps++;
         Box b = s.mPool.back();
         s.mPool.pop_back();
         getCenter(b, c);
         double v = bm.calcFunc(c);
-        if (v < s.mRecordVal) {
-            s.mRecordVal = v;
-            s.mRecord = c;
+        if (v < record.getValue()) {
+            record.update(v, c);
         }
         auto lb = bm.calcInterval(b).lb();
-        if (lb <= s.mRecordVal - eps) {
+        if (lb <= record.getValue() - eps) {
             split(b, s.mPool);
         }
         if (s.mSteps >= s.mMaxSteps)
@@ -145,21 +149,20 @@ void solve(State& s, const BM& bm, double eps) {
     if ((s.mProcs == 1) || (s.mMaxSteps <= mtStepsLimit)) {
         solveSerial(s, bm, eps);
     } else {
-        auto presolve = [&](State& s) {
+        auto presolve = [&](State & s) {
             const int dim = bm.getDim();
             std::vector<double> c(dim);
             while ((!s.mPool.empty()) && (s.mPool.size() < 2)) {
-                s.mSteps ++;
+                s.mSteps++;
                 Box b = s.mPool.back();
                 s.mPool.pop_back();
                 getCenter(b, c);
                 double v = bm.calcFunc(c);
-                if (v < s.mRecordVal) {
-                    s.mRecordVal = v;
-                    s.mRecord = c;
+                if (v < record.getValue()) {
+                    record.update(v, c);
                 }
                 auto lb = bm.calcInterval(b).lb();
-                if (lb <= s.mRecordVal - eps) {
+                if (lb <= record.getValue() - eps) {
                     split(b, s.mPool);
                 }
                 if (s.mSteps >= s.mMaxSteps)
@@ -168,7 +171,7 @@ void solve(State& s, const BM& bm, double eps) {
         };
 
         while (true) {
-            if(s.mPool.empty())
+            if (s.mPool.empty())
                 break;
             //std::cout << s << "\n";
             presolve(s);
@@ -205,8 +208,9 @@ double findMin(const BM& bm, double eps, int maxstep) {
         ibox.emplace_back(bm.getBounds()[i].first, bm.getBounds()[i].second);
     }
     State s;
+    std::vector<double> recvec(dim, 0);
+    record.update(std::numeric_limits<double>::max(), recvec);
     s.mPool.push_back(ibox);
-    s.mRecordVal = std::numeric_limits<double>::max();
     s.mMaxSteps = maxstep;
     s.mProcs = procs;
     std::chrono::time_point<std::chrono::system_clock> start, end;
@@ -217,7 +221,7 @@ double findMin(const BM& bm, double eps, int maxstep) {
     solve(s, bm, eps);
 #endif
     end = std::chrono::system_clock::now();
-    int mseconds = (std::chrono::duration_cast<std::chrono::microseconds> (end-start)).count();
+    int mseconds = (std::chrono::duration_cast<std::chrono::microseconds> (end - start)).count();
     std::cout << "Time: " << mseconds << " microsecond\n";
     std::cout << "Time per subproblem: " << (double) s.mSteps / (double) mseconds << " miscroseconds." << std::endl;
     if (s.mSteps >= maxstep) {
@@ -225,12 +229,12 @@ double findMin(const BM& bm, double eps, int maxstep) {
     } else {
         std::cout << "Converged in " << s.mSteps << " steps\n";
     }
-    
-    std::cout << "BnB found = " << s.mRecordVal << std::endl;
+
+    std::cout << "BnB found = " << record.getValue() << std::endl;
     std::cout << " at x [ ";
-    std::copy(s.mRecord.begin(), s.mRecord.end(), std::ostream_iterator<double>(std::cout, " "));
+    std::copy(record.mVector.begin(), record.mVector.end(), std::ostream_iterator<double>(std::cout, " "));
     std::cout << "]\n";
-    return s.mRecordVal;
+    return record.getValue();
 }
 
 bool testBench(const BM& bm) {

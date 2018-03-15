@@ -33,7 +33,7 @@ OPTIMOPT=-O
 #STATIC=-static
 
 #C++ 11 support on
-STD_OPT = -std=c++14
+STD_OPT = -std=c++17
 
 
 # Auxilary headers
