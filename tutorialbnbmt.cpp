@@ -23,11 +23,12 @@
 using BM = Benchmark<double>;
 using Box = std::vector<Interval<double>>;
 
-const static int procs = 64;
+static int procs = 8;
 
-const static int mtStepsLimit = 1000;
+static int mtStepsLimit = 1000;
 
-const static int maxStepsTotal = 1000000;
+static int maxStepsTotal = 1000000;
+
 
 struct State {
 
@@ -219,7 +220,7 @@ double findMin(const BM& bm, double eps, int maxstep) {
     end = std::chrono::system_clock::now();
     int mseconds = (std::chrono::duration_cast<std::chrono::microseconds> (end-start)).count();
     std::cout << "Time: " << mseconds << " microsecond\n";
-    std::cout << "Time per subproblem: " << (double) s.mSteps / (double) mseconds << " miscroseconds." << std::endl;
+    std::cout << "Time per subproblem: " << (double) mseconds / (double) s.mSteps << " miscroseconds." << std::endl;
     if (s.mSteps >= maxstep) {
         std::cout << "Failed to converge in " << maxstep << " steps\n";
     } else {
@@ -246,9 +247,22 @@ bool testBench(const BM& bm) {
     std::cout << "****************************************" << std::endl << std::endl;
 }
 
-main() {
+main(int argc, char* argv[]) {
+    if(argc >= 2) {
+        procs = atoi(argv[1]);              
+    } 
+    if(argc >= 3) {
+        mtStepsLimit = atoi(argv[2]);
+    }
+    if(argc >= 4) {
+        maxStepsTotal = atoi(argv[3]);
+    }
+    std::cout << "Simple PBnB solver with np = " << procs << ", mtStepsLimit =  " << mtStepsLimit << ", maxStepsTotal = " << maxStepsTotal << std::endl;
+    PowellSingular2Benchmark<double> pb(8);
+    testBench(pb);
+    /*
     Benchmarks<double> tests;
     for (auto bm : tests) {
         testBench(*bm);
-    }
+    }*/
 }
