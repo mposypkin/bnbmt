@@ -125,13 +125,14 @@ void solveSerial(State& s, const BM& bm, double eps) {
     const int dim = bm.getDim();
     std::vector<double> c(dim);
     while (!s.mPool.empty()) {
-        s.mSteps ++;
+        s.mSteps++;
         Box b = s.mPool.back();
         s.mPool.pop_back();
         getCenter(b, c);
         double v = bm.calcFunc(c);
-        if (v < recv) {
-            recv = v;
+        double rv = recv;
+        while (v < rv) {
+            recv.compare_exchange_strong(rv, v);
             s.mRecordVal = v;
             s.mRecord = c;
         }
@@ -148,17 +149,18 @@ void solve(State& s, const BM& bm, double eps) {
     if ((s.mProcs == 1) || (s.mMaxSteps <= mtStepsLimit)) {
         solveSerial(s, bm, eps);
     } else {
-        auto presolve = [&](State& s) {
+        auto presolve = [&](State & s) {
             const int dim = bm.getDim();
             std::vector<double> c(dim);
             while ((!s.mPool.empty()) && (s.mPool.size() < 2)) {
-                s.mSteps ++;
+                s.mSteps++;
                 Box b = s.mPool.back();
                 s.mPool.pop_back();
                 getCenter(b, c);
                 double v = bm.calcFunc(c);
-                if (v < recv) {
-                    recv = v;
+                double rv = recv;
+                while (v < rv) {
+                    recv.compare_exchange_strong(rv, v);
                     s.mRecordVal = v;
                     s.mRecord = c;
                 }
@@ -172,7 +174,7 @@ void solve(State& s, const BM& bm, double eps) {
         };
 
         while (true) {
-            if(s.mPool.empty())
+            if (s.mPool.empty())
                 break;
             //std::cout << s << "\n";
             presolve(s);
@@ -222,7 +224,7 @@ double findMin(const BM& bm, double eps, int maxstep) {
     solve(s, bm, eps);
 #endif
     end = std::chrono::system_clock::now();
-    int mseconds = (std::chrono::duration_cast<std::chrono::microseconds> (end-start)).count();
+    int mseconds = (std::chrono::duration_cast<std::chrono::microseconds> (end - start)).count();
     std::cout << "Time: " << mseconds << " microsecond\n";
     std::cout << "Time per subproblem: " << (double) s.mSteps / (double) mseconds << " miscroseconds." << std::endl;
     if (s.mSteps >= maxstep) {
@@ -230,7 +232,7 @@ double findMin(const BM& bm, double eps, int maxstep) {
     } else {
         std::cout << "Converged in " << s.mSteps << " steps\n";
     }
-    
+
     std::cout << "BnB found = " << s.mRecordVal << std::endl;
     std::cout << " at x [ ";
     std::copy(s.mRecord.begin(), s.mRecord.end(), std::ostream_iterator<double>(std::cout, " "));
@@ -252,13 +254,13 @@ bool testBench(const BM& bm) {
 }
 
 main(int argc, char* argv[]) {
-    if(argc >= 2) {
-        procs = atoi(argv[1]);              
-    } 
-    if(argc >= 3) {
+    if (argc >= 2) {
+        procs = atoi(argv[1]);
+    }
+    if (argc >= 3) {
         mtStepsLimit = atoi(argv[2]);
     }
-    if(argc >= 4) {
+    if (argc >= 4) {
         maxStepsTotal = atoi(argv[3]);
     }
     std::cout << "Simple PBnB solver with np = " << procs << ", mtStepsLimit =  " << mtStepsLimit << ", maxStepsTotal = " << maxStepsTotal << std::endl;
