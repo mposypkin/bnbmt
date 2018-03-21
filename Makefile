@@ -1,5 +1,5 @@
 ROOT = ../testbed/mathexplib/
-BINS = tutorialbnbmt.exe bnbmtsmart.exe bnbshrec.exe bnbatomic.exe
+BINS = tutorialbnbmt.exe bnbshrec.exe bnbatomic.exe
 TESTS = 
 
 
