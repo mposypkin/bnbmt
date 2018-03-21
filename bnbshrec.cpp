@@ -42,13 +42,23 @@ struct Record {
     void update(double nval, const std::vector<double>& nrecord) {
         //std::unique_lock<std::shared_mutex> lock(mMut);
         std::lock_guard<std::mutex> lock(mMut);
+        if (nval < mValue) {
+            mValue = nval;
+            mVector = nrecord;
+        }
+    }
+
+    void set(double nval, const std::vector<double>& nrecord) {
+        //std::unique_lock<std::shared_mutex> lock(mMut);
+        std::lock_guard<std::mutex> lock(mMut);
         mValue = nval;
         mVector = nrecord;
     }
 
+
     //mutable std::shared_mutex mMut;
     mutable std::mutex mMut;
-    double mValue;
+    double mValue = std::numeric_limits<double>::max();
     std::vector<double> mVector;
 };
 
@@ -209,7 +219,7 @@ double findMin(const BM& bm, double eps, int maxstep) {
     }
     State s;
     std::vector<double> recvec(dim, 0);
-    record.update(std::numeric_limits<double>::max(), recvec);
+    record.set(std::numeric_limits<double>::max(), recvec);
     s.mPool.push_back(ibox);
     s.mMaxSteps = maxstep;
     s.mProcs = procs;
@@ -261,7 +271,7 @@ main(int argc, char* argv[]) {
         maxStepsTotal = atoi(argv[3]);
     }
     std::cout << "Smart solver with np = " << procs << ", mtStepsLimit =  " << mtStepsLimit << ", maxStepsTotal = " << maxStepsTotal << std::endl;
-    
+
 #if 0
     PowellSingular2Benchmark<double> pb(8);
     testBench(pb);
@@ -271,5 +281,5 @@ main(int argc, char* argv[]) {
         testBench(*bm);
     }
 #endif  
-    
+
 }
