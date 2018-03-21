@@ -131,7 +131,7 @@ void solveSerial(State& s, const BM& bm, double eps) {
         getCenter(b, c);
         double v = bm.calcFunc(c);
         if (v < recv) {
-            recv;
+            recv = v;
             s.mRecordVal = v;
             s.mRecord = c;
         }
@@ -262,6 +262,7 @@ main(int argc, char* argv[]) {
         maxStepsTotal = atoi(argv[3]);
     }
     std::cout << "Simple PBnB solver with np = " << procs << ", mtStepsLimit =  " << mtStepsLimit << ", maxStepsTotal = " << maxStepsTotal << std::endl;
+    std::cout << "record is " << (recv.is_lock_free() ? "lock free" : "not lock free") << std::endl;
 #if 0    
     PowellSingular2Benchmark<double> pb(8);
     testBench(pb);

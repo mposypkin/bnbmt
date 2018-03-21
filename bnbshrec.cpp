@@ -33,21 +33,21 @@ static int maxStepsTotal = 1000000;
 struct Record {
 
     double getValue() const {
-        std::shared_lock<std::shared_mutex> lock(mMut);
+        //std::shared_lock<std::shared_mutex> lock(mMut);
         //std::unique_lock<std::shared_mutex> lock(mMut);
-        //std::lock_guard<std::mutex> lock(mMut);
+        std::lock_guard<std::mutex> lock(mMut);
         return mValue;
     }
 
     void update(double nval, const std::vector<double>& nrecord) {
-        std::unique_lock<std::shared_mutex> lock(mMut);
-        //std::lock_guard<std::mutex> lock(mMut);
+        //std::unique_lock<std::shared_mutex> lock(mMut);
+        std::lock_guard<std::mutex> lock(mMut);
         mValue = nval;
         mVector = nrecord;
     }
 
-    mutable std::shared_mutex mMut;
-    //mutable std::mutex mMut;
+    //mutable std::shared_mutex mMut;
+    mutable std::mutex mMut;
     double mValue;
     std::vector<double> mVector;
 };
