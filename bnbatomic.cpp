@@ -31,6 +31,12 @@ static int maxStepsTotal = 1000000;
 
 std::atomic<double> recv;
 
+//const std::memory_order morder = std::memory_order_seq_cst;
+const std::memory_order morder = std::memory_order_relaxed;
+
+#define EXCHNAGE_OPER compare_exchange_strong
+//#define EXCHNAGE_OPER compare_exchange_weak
+
 struct State {
 
     void merge(const State& s) {
@@ -130,9 +136,10 @@ void solveSerial(State& s, const BM& bm, double eps) {
         s.mPool.pop_back();
         getCenter(b, c);
         double v = bm.calcFunc(c);
-        double rv = recv;
+        double rv = recv.load(morder);
         while (v < rv) {
-            recv.compare_exchange_strong(rv, v);
+            //            recv.compare_exchange_strong(rv, v);
+            recv.EXCHNAGE_OPER(rv, v, morder);
             s.mRecordVal = v;
             s.mRecord = c;
         }
@@ -158,9 +165,10 @@ void solve(State& s, const BM& bm, double eps) {
                 s.mPool.pop_back();
                 getCenter(b, c);
                 double v = bm.calcFunc(c);
-                double rv = recv;
+                double rv = recv.load(morder);
                 while (v < rv) {
-                    recv.compare_exchange_strong(rv, v);
+                    //recv.compare_exchange_strong(rv, v);
+                    recv.EXCHNAGE_OPER(rv, v, morder);
                     s.mRecordVal = v;
                     s.mRecord = c;
                 }
